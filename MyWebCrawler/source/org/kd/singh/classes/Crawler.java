@@ -13,17 +13,47 @@ import java.util.ArrayList;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
+import org.jsoup.select.Elements;
 import org.kd.singh.tags.Anchor;
 
 public class Crawler {
 
-	String url;
-	private String test;
+	String url = null;
+	String name = "Home";
 
+	private String test;
+	HTMLPage pageObj = null;
+	ArrayList<String> pageLines = null;
 	URLConnection url_to_find = null;
+	
+	//Jsoup
+	Document jDoc = null;
+	Element jMetaAuthor = null;
+	Element jMetaDescription = null;
+	Element jMetaKeywords = null;
 	
 	
 	public Crawler() {
+	}
+	
+	private boolean isURLInitialized(){
+		if(this.url!=null){
+			return true;
+		}else{
+			return false;
+		}
+	}
+	
+	
+	public void setName(String name){
+		this.name = name;
+	}
+	
+	public String getName(){
+		return this.name;
 	}
 	
 	public void getSiteMap() throws MalformedURLException, IOException{
@@ -33,47 +63,97 @@ public class Crawler {
 		BufferedReader in = new BufferedReader(new InputStreamReader(robotsTxt.getInputStream()));
 		String inputLine;
 		while((inputLine = in.readLine())!=null){
-			System.out.println(inputLine);
+//			System.out.println(inputLine);
 		}
 	}
 	
-	public void setUrl(String url){
+	public void setUrl(String url) throws MalformedURLException, IOException{
 		this.url = url;
+		this.pageObj = new HTMLPage(this.url);
+		this.pageLines = pageObj.getPage();
+		
+		jDoc = Jsoup.parse(pageLines.toString());
+		jMetaDescription = jDoc.select("META[name=description]").first();
+		jMetaAuthor = jDoc.select("META[name=author]").first();
+		jMetaKeywords = jDoc.select("Meta[name=keywords]").first();
+		
 	}
 	
-	public ArrayList<String> getPage() throws MalformedURLException, IOException{
-		HTMLPage pageObj = new HTMLPage(this.url);
-		ArrayList<String> page = pageObj.getPage();
-		return page;
+	public String getKeyWords(){
+		String keywords = new String();
+		if(jMetaKeywords!=null){
+			keywords = jMetaKeywords.attr("content");
+		}
+		return keywords;
 	}
 	
-	public ArrayList<String> getAnchorLinks() throws IOException{
-		ArrayList<Anchor> anchor_list = getAnchorTag();
-		ArrayList<String> anchor_href_list = new ArrayList<String>();
-		for (Anchor a : anchor_list) {
-			anchor_href_list.add(UrlHelper.modifyUrl(a.getAnchorHref(), url));
+	public String getAuthor(){
+		String author = new String();
+		if(jMetaAuthor!=null){
+			author = jMetaAuthor.attr("content");
+		}
+		return author;
+	}
+
+	public String getDescription(){
+		String desc = new String();
+		if(jMetaDescription!=null){
+			desc = jMetaDescription.attr("content");
+		}
+		return desc;
+	}
+	
+	public String getUrl(){
+		return this.url;
+	}
+	
+	/**
+	 * 
+	 * @return
+	 * @throws Exception 
+	 */
+	public ArrayList<Anchor> getAnchorLinks() throws IOException{
+		if(!isURLInitialized()){
+			throw new IOException("Please call method setUrl() first");
+		}
+		ArrayList<Anchor> anchor_href_list = new ArrayList<Anchor>();
+		
+		Elements anchor_tags = jDoc.select("a");
+		for(Element e: anchor_tags){
+			String href = UrlHelper.modifyUrl(e.attr("href"), url);
+			String label = e.html();
+			Anchor temp_anchor = new Anchor(label, href);
+			anchor_href_list.add(temp_anchor);
 		}
 		return anchor_href_list;
 	}
 	
-	public String getTitle() throws MalformedURLException, IOException{
-		URLConnection url_to_find = new URL(url).openConnection();
-		url_to_find.addRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2272.118 Safari/537.36");
-
-		return null;
+	/**
+	 * 
+	 * @return
+	 * @throws IOException
+	 */
+	public String getTitle() throws IOException {
+		if(!isURLInitialized()){
+			throw new IOException("Please call method setUrl() first"); 
+		}
+		return pageObj.getTitle();
 	}
 	
+	@Deprecated
 	public ArrayList<Anchor> getAnchorTag() throws IOException{
+		if(!isURLInitialized()){
+			throw new IOException("Please call method setUrl() first");
+		}
 		ArrayList<Anchor> links = new ArrayList<Anchor>();
-		ArrayList<String> page = getPage();
-		for(String line: page){
+		for(String line: pageLines){
 			ArrayList<Anchor> list = HTMLPage.getTags(TypeHtmlTag.ANCHOR, line);
 			links.addAll(list);
 		}
 
 		return links;
 	}
-	
+		
 	public String getTest(){
 		return "testing";
 	}
